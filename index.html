@@ -1,10 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>YouMOVE VR</title>
-<link rel="manifest" href="manifest.json">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YouMOVE VR – ROM Tracker</title>
 <style>
 body{font-family:system-ui;background:#0b1016;color:#eaf2f8;margin:0;padding:20px}
 .card{background:#121820;padding:16px;border-radius:14px;margin-bottom:12px}
@@ -35,7 +34,7 @@ Joint
 Plane
 <select id="plane">
 <option value="beta">Flexion/Extension</option>
-<option value="gamma">Abduction</option>
+<option value="gamma">Abduction/Adduction</option>
 <option value="alpha">Rotation</option>
 </select>
 
@@ -49,9 +48,9 @@ Language
 
 <div class="card">
 <div class="kpi">
-<div>Angle <span id="angle">0</span>°</div>
-<div>Min <span id="min">0</span></div>
-<div>Max <span id="max">0</span></div>
+<div>Angle <span id="angle">0.0</span>°</div>
+<div>Min <span id="min">0.0</span></div>
+<div>Max <span id="max">0.0</span></div>
 </div>
 
 <br>
@@ -81,138 +80,167 @@ Language
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
-let running=false, zero=0, currentAngle=0, min=999, max=-999;
-let sessionData=[], captureInterval, speechInterval;
+let running = false;
+let zero = 0;
+let currentAngle = 0;
+let min = Infinity;
+let max = -Infinity;
+let sessionData = [];
+let captureInterval, speechInterval;
 
-const angleEl=document.getElementById("angle");
-const minEl=document.getElementById("min");
-const maxEl=document.getElementById("max");
+const angleEl = document.getElementById("angle");
+const minEl = document.getElementById("min");
+const maxEl = document.getElementById("max");
 
+// --- Speech synthesis ---
 function speak(text){
-  const msg = new SpeechSynthesisUtterance(text);
-  speechSynthesis.speak(msg);
+    const msg = new SpeechSynthesisUtterance(text);
+    speechSynthesis.speak(msg);
 }
 
 function speakAngle(){
-  const lang=document.getElementById("language").value;
-  let text="";
-  if(lang==="en") text=`Angle ${currentAngle.toFixed(1)} degrees`;
-  if(lang==="de") text=`Winkel ${currentAngle.toFixed(1)} Grad`;
-  if(lang==="es") text=`Ángulo ${currentAngle.toFixed(1)} grados`;
-  speak(text);
+    const lang = document.getElementById("language").value;
+    let text = "";
+    if(lang==="en") text = `Angle ${currentAngle.toFixed(1)} degrees`;
+    if(lang==="de") text = `Winkel ${currentAngle.toFixed(1)} Grad`;
+    if(lang==="es") text = `Ángulo ${currentAngle.toFixed(1)} grados`;
+    speak(text);
 }
 
+// --- Start speech announcements every 10 seconds ---
 function startSpeech(){
-  speechInterval=setInterval(()=>{if(running) speakAngle();},10000);
+    speechInterval = setInterval(()=>{
+        if(running) speakAngle();
+    },10000);
 }
 
+// --- Capture session ---
 function startCapture(){
-  sessionData=[];
-  captureInterval=setInterval(()=>{
-    sessionData.push({time:new Date().toLocaleTimeString(), angle:currentAngle});
-    render();
-  },5000);
+    sessionData=[];
+    captureInterval = setInterval(()=>{
+        sessionData.push({
+            time: new Date().toLocaleTimeString(),
+            angle: currentAngle
+        });
+        render();
+    },5000);
 }
 
-function stopCapture(){clearInterval(captureInterval);}
+function stopCapture(){
+    clearInterval(captureInterval);
+}
 
+// --- Render table ---
 function render(){
-  const table=document.getElementById("records");
-  table.innerHTML="";
-  sessionData.forEach(r=>{
-    let row=document.createElement("tr");
-    row.innerHTML=`<td>${r.time}</td><td>${r.angle.toFixed(1)}</td>`;
-    table.appendChild(row);
-  });
+    const table = document.getElementById("records");
+    table.innerHTML="";
+    sessionData.forEach(r=>{
+        let row=document.createElement("tr");
+        row.innerHTML=`<td>${r.time}</td><td>${r.angle.toFixed(1)}</td>`;
+        table.appendChild(row);
+    });
 }
 
-function saveCurrentRecord(alertUser=true){
-  sessionData.push({time:new Date().toLocaleTimeString(), angle:currentAngle});
-  render();
-  if(alertUser) speak("Record saved");
-}
+// --- Enable sensors with iOS permission ---
+document.getElementById("enableBtn").onclick = async () => {
+    // iOS 13+ requires permission
+    if (typeof DeviceOrientationEvent !== 'undefined' && 
+        typeof DeviceOrientationEvent.requestPermission === 'function') {
+        try {
+            const res = await DeviceOrientationEvent.requestPermission();
+            if(res !== 'granted'){
+                alert('Permission denied for motion sensors');
+                return;
+            }
+        } catch(err){ alert('Error requesting motion permission: ' + err); return; }
+    }
 
-function analyzeMovement(){
-  if(sessionData.length<2) return;
-  let diffs=[];
-  for(let i=1;i<sessionData.length;i++){
-    diffs.push(Math.abs(sessionData[i].angle-sessionData[i-1].angle));
-  }
-  let avg=diffs.reduce((a,b)=>a+b,0)/diffs.length;
-  let result="";
-  if(avg<2) result="Very smooth movement";
-  else if(avg<5) result="Normal movement";
-  else result="Irregular movement";
-  alert("Movement Quality: "+result);
-  speak("Movement quality: "+result);
-}
-
-function exportCSV(){
-  let csv="time,angle\n";
-  sessionData.forEach(r=>{csv+=`${r.time},${r.angle}\n`;});
-  let blob=new Blob([csv]);
-  let a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);
-  a.download="session.csv";
-  a.click();
-}
-
-function exportPDF(){
-  const {jsPDF}=window.jspdf;
-  const doc=new jsPDF();
-  doc.text("YouMOVE Clinical Report",20,20);
-  doc.text("Joint: "+document.getElementById("joint").value,20,40);
-  doc.text("Max ROM: "+max.toFixed(1),20,50);
-  doc.text("Min ROM: "+min.toFixed(1),20,60);
-  doc.save("YouMOVE_Report.pdf");
-}
-
-// Enable sensors
-document.getElementById("enableBtn").onclick=()=>{
-  window.addEventListener("deviceorientation",e=>{
-    if(!running) return;
-    let val=0;
-    const plane=document.getElementById("plane").value;
-    if(plane==="alpha") val=e.alpha;
-    if(plane==="beta") val=e.beta;
-    if(plane==="gamma") val=e.gamma;
-    currentAngle=val-zero;
-    if(currentAngle>max) max=currentAngle;
-    if(currentAngle<min) min=currentAngle;
-    angleEl.innerText=currentAngle.toFixed(1);
-    minEl.innerText=min.toFixed(1);
-    maxEl.innerText=max.toFixed(1);
-  });
+    window.addEventListener("deviceorientation", e=>{
+        if(!running) return;
+        let val=0;
+        const plane = document.getElementById("plane").value;
+        if(plane==="alpha") val=e.alpha;
+        if(plane==="beta") val=e.beta;
+        if(plane==="gamma") val=e.gamma;
+        currentAngle = val - zero;
+        if(currentAngle>max) max=currentAngle;
+        if(currentAngle<min) min=currentAngle;
+        angleEl.innerText=currentAngle.toFixed(1);
+        minEl.innerText=min.toFixed(1);
+        maxEl.innerText=max.toFixed(1);
+    });
+    speak("Sensors enabled. Say 'Set zero' to calibrate.");
 };
 
-// Buttons
-document.getElementById("startBtn").onclick=()=>{if(!running){running=true; startCapture(); startSpeech(); speak("Measurement started");}};
-document.getElementById("stopBtn").onclick=()=>{if(running){running=false; stopCapture(); clearInterval(speechInterval); analyzeMovement(); speak("Measurement stopped");}};
-document.getElementById("saveBtn").onclick=()=>{saveCurrentRecord();};
-document.getElementById("csvBtn").onclick=()=>{exportCSV();};
-document.getElementById("pdfBtn").onclick=()=>{exportPDF();};
+// --- Start/Stop ---
+document.getElementById("startBtn").onclick = ()=>{
+    running=true;
+    startCapture();
+    startSpeech();
+};
 
-// Voice commands
-if('webkitSpeechRecognition' in window || 'SpeechRecognition' in window){
-  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const rec = new SpeechRec();
-  rec.continuous=true; rec.lang='en-US';
-  rec.onresult=e=>{
-    const txt=e.results[e.results.length-1][0].transcript.toLowerCase();
-    console.log("Voice command:",txt);
-    if(txt.includes("set zero")){zero=currentAngle; speak("Zero calibrated"); alert("Zero calibrated");}
-    if(txt.includes("start")){if(!running){running=true; startCapture(); startSpeech(); speak("Measurement started");}}
-    if(txt.includes("stop")){if(running){running=false; stopCapture(); clearInterval(speechInterval); analyzeMovement(); speak("Measurement stopped");}}
-    if(txt.includes("save")){saveCurrentRecord();}
-    if(txt.includes("export csv")){exportCSV(); speak("CSV exported");}
-    if(txt.includes("generate pdf") || txt.includes("export pdf")){exportPDF(); speak("PDF generated");}
-  };
-  rec.start();
+document.getElementById("stopBtn").onclick = ()=>{
+    running=false;
+    stopCapture();
+    clearInterval(speechInterval);
+    analyzeMovement();
+};
+
+// --- Analyze movement quality ---
+function analyzeMovement(){
+    if(sessionData.length<2) return alert("Not enough data to analyze.");
+    let diffs=[];
+    for(let i=1;i<sessionData.length;i++){
+        diffs.push(Math.abs(sessionData[i].angle-sessionData[i-1].angle));
+    }
+    let avg=diffs.reduce((a,b)=>a+b,0)/diffs.length;
+    let result="";
+    if(avg<2) result="Very smooth movement";
+    else if(avg<5) result="Normal movement";
+    else result="Irregular movement";
+    alert("Movement Quality: "+result);
 }
 
-// PWA service worker
-if('serviceWorker' in navigator){navigator.serviceWorker.register('service-worker.js');}
-</script>
+// --- PDF ---
+document.getElementById("pdfBtn").onclick = ()=>{
+    const {jsPDF} = window.jspdf;
+    const doc = new jsPDF();
+    doc.text("YouMOVE Clinical Report",20,20);
+    doc.text("Joint: "+document.getElementById("joint").value,20,40);
+    doc.text("Max ROM: "+max.toFixed(1),20,50);
+    doc.text("Min ROM: "+min.toFixed(1),20,60);
+    doc.save("YouMOVE_Report.pdf");
+};
 
+// --- CSV ---
+document.getElementById("csvBtn").onclick = ()=>{
+    let csv="time,angle\n";
+    sessionData.forEach(r=>{ csv+=`${r.time},${r.angle}\n`; });
+    let blob=new Blob([csv]);
+    let a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download="session.csv";
+    a.click();
+};
+
+// --- Voice command: Set zero ---
+if('webkitSpeechRecognition' in window){
+    const rec=new webkitSpeechRecognition();
+    rec.continuous=true;
+    rec.onresult=e=>{
+        let txt=e.results[e.results.length-1][0].transcript.toLowerCase();
+        if(txt.includes("set zero")){
+            zero=currentAngle;
+            speak("Zero calibrated");
+        }
+    };
+    rec.start();
+}
+
+// --- PWA service worker ---
+if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('service-worker.js');
+}
+</script>
 </body>
 </html>
