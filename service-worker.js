@@ -1,30 +1,20 @@
-self.addEventListener("install",e=>{
+const CACHE_NAME = 'youmove-cache-v1';
+const urlsToCache = [
+  './',
+  './index.html',
+  './manifest.json',
+  'https://cdn.jsdelivr.net/npm/chart.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'
+];
 
-e.waitUntil(
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))
+  );
+});
 
-caches.open("youmove").then(cache=>{
-
-return cache.addAll([
-"/",
-"/index.html"
-])
-
-})
-
-)
-
-})
-
-self.addEventListener("fetch",e=>{
-
-e.respondWith(
-
-caches.match(e.request).then(res=>{
-
-return res || fetch(e.request)
-
-})
-
-)
-
-})
+self.addEventListener('fetch', event => {
+  event.respondWith(
+    caches.match(event.request).then(response => response || fetch(event.request))
+  );
+});
