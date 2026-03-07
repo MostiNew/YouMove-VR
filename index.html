@@ -3,161 +3,239 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-<title>ROM Tracker – YouMOVE VR</title>
+<title>YouMOVE – Voice & Motion ROM Tracker</title>
 <style>
-  :root { --bg:#0b1016; --card:#121820; --muted:#8aa0b2; --text:#eaf2f8; --accent:#50c878; --danger:#ff6b6b; --warn:#ffc857; --flash:#50c878; }
-  *{box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
-  body{margin:0;background:linear-gradient(180deg,#0b1016,#0e141c);color:var(--text)}
-  .wrap{max-width:960px;margin:0 auto;padding:16px 14px 40px}
-  header{display:flex;align-items:center;gap:12px;justify-content:space-between;margin:6px 0 14px}
-  h1{font-size:22px;margin:0}
-  .card{background:var(--card);border:1px solid #1d2732;border-radius:18px;padding:14px;margin:10px 0;box-shadow:0 6px 24px rgba(0,0,0,.28)}
-  label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
-  select, input[type="text"], button, input[type="number"]{width:100%;padding:12px 12px;border-radius:12px;border:1px solid #203040;background:#0b1118;color:var(--text);font-size:15px}
-  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  .btn{cursor:pointer;transition:transform .02s ease,opacity .2s}
-  .btn:active{transform:scale(.98)}
-  .btn.primary{background:var(--accent);color:#072d19;border-color:#0d5b3a;font-weight:700}
-  .btn.ghost{background:#0a121a;border-color:#1d2a38}
-  .kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
-  .tile{background:#0a121a;border:1px solid #1d2a38;border-radius:16px;padding:14px;text-align:center}
-  .tile h3{margin:4px 0 0;font-size:24px}
-  .tile span{font-size:12px;color:var(--muted)}
-  .muted{color:var(--muted)}
-  .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:24px;background:#0f1b23;padding:10px 14px;border-radius:10px;border:1px solid #1f2f3a;box-shadow:0 6px 20px rgba(0,0,0,.4);display:none;z-index:999}
+:root { --bg:#0b1016; --card:#121820; --muted:#8aa0b2; --text:#eaf2f8; --accent:#50c878; --danger:#ff6b6b; --warn:#ffc857; --flash:#50c878; }
+*{box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+body{margin:0;background:linear-gradient(180deg,#0b1016,#0e141c);color:var(--text)}
+.wrap{max-width:960px;margin:0 auto;padding:16px 14px 40px}
+header{display:flex;align-items:center;gap:12px;justify-content:space-between;margin:6px 0 14px}
+h1{font-size:22px;margin:0}
+.card{background:var(--card);border:1px solid #1d2732;border-radius:18px;padding:14px;margin:10px 0;box-shadow:0 6px 24px rgba(0,0,0,.28)}
+label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+select, input[type="text"], button, input[type="number"]{width:100%;padding:12px 12px;border-radius:12px;border:1px solid #203040;background:#0b1118;color:var(--text);font-size:15px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.btn{cursor:pointer;transition:transform .02s ease,opacity .2s}
+.btn:active{transform:scale(.98)}
+.btn.primary{background:var(--accent);color:#072d19;border-color:#0d5b3a;font-weight:700}
+.btn.warn{background:var(--warn);color:#432; border-color:#a77}
+.btn.danger{background:var(--danger);color:#320a0a;border-color:#7a1e1e}
+.btn.ghost{background:#0a121a;border-color:#1d2a38}
+.kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.tile{background:#0a121a;border:1px solid #1e2d3e;border-radius:16px;padding:14px;text-align:center}
+.tile h3{margin:4px 0 0;font-size:24px}
+.tile span{font-size:12px;color:var(--muted)}
+.muted{color:var(--muted)}
+table{width:100%;border-collapse:collapse}
+th, td{font-size:13px;border-bottom:1px solid #203040;padding:10px 8px;text-align:left;vertical-align:top}
+th{color:#a9bfd2;font-weight:600}
+.pill{display:inline-block;padding:4px 8px;border-radius:999px;background:#0e1822;border:1px solid #1e2d3e;font-size:12px}
+.hint{font-size:12px;color:var(--muted);margin-top:8px}
+.flex{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.right{margin-left:auto}
+.small{font-size:12px}
+.separator{height:1px;background:#203040;margin:10px 0;border-radius:1px}
+button:focus{ outline:3px solid rgba(80,200,120,0.18); outline-offset:2px; }
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:24px;background:#0f1b23;padding:10px 14px;border-radius:10px;border:1px solid #1f2f3a;box-shadow:0 6px 20px rgba(0,0,0,.4);display:none;z-index:999}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <header>
-    <h1>YouMOVE VR – Gelenkmessung</h1>
-    <div class="row" style="width:220px">
-      <button id="btnEnable" class="btn ghost">Enable Sensors</button>
-    </div>
-  </header>
-
-  <div class="card">
-    <div class="row">
-      <div>
-        <label>Joint</label>
-        <select id="joint">
-          <option>Shoulder</option><option>Elbow</option><option>Wrist</option>
-          <option>Hip</option><option>Knee</option><option>Ankle</option>
-          <option>Cervical Spine</option><option>Lumbar Spine</option><option>Custom</option>
-        </select>
-      </div>
-      <div>
-        <label>Plane / Movement</label>
-        <select id="plane">
-          <option value="beta">Flexion/Extension (β / pitch)</option>
-          <option value="gamma">Abduction/Adduction (γ / roll)</option>
-          <option value="alpha">Rotation (α / yaw)</option>
-        </select>
-      </div>
-    </div>
-    <div class="row" style="margin-top:10px;">
-      <div>
-        <label>Side</label>
-        <select id="side">
-          <option>Right</option><option>Left</option><option>Midline</option>
-        </select>
-      </div>
-      <div>
-        <label>Notes</label>
-        <input id="notes" type="text" placeholder="Optional notes">
-      </div>
-    </div>
-    <div style="margin-top:10px;">
-      <span>Angle: <span id="angle">—</span>°</span>
-      <span style="margin-left:20px">Min: <span id="min">—</span>°</span>
-      <span style="margin-left:20px">Max: <span id="max">—</span>°</span>
-      <span style="margin-left:20px">Zero: <span id="zero">—</span>°</span>
-    </div>
-  </div>
-
+<header>
+<h1>YouMOVE – Voice & Motion ROM Tracker</h1>
+<div class="flex">
+<button id="btnEnable" class="btn ghost">Enable Sensors</button>
 </div>
+</header>
+
+<div class="card">
+<div class="row">
+<div>
+<label>Joint</label>
+<select id="joint">
+<option>Shoulder</option>
+<option>Elbow</option>
+<option>Wrist</option>
+<option>Hip</option>
+<option>Knee</option>
+<option>Ankle</option>
+<option>Cervical Spine</option>
+<option>Lumbar Spine</option>
+<option>Custom</option>
+</select>
+</div>
+<div>
+<label>Plane</label>
+<select id="plane">
+<option value="beta">Flexion/Extension (β / pitch)</option>
+<option value="gamma">Abduction/Adduction (γ / roll)</option>
+<option value="alpha">Rotation (α / yaw)</option>
+</select>
+</div>
+</div>
+<div class="row">
+<div>
+<label>Side</label>
+<select id="side">
+<option>Right</option>
+<option>Left</option>
+<option>Midline</option>
+</select>
+</div>
+<div>
+<label>Notes (optional)</label>
+<input id="notes" type="text" placeholder="e.g., post-op wk 2, pain at end-range">
+</div>
+</div>
+<div class="hint">Say "Set Zero" to calibrate before movement. The system will read angles every 10 seconds automatically.</div>
+</div>
+
+<div class="card">
+<div class="kpi">
+<div class="tile"><span>Angle (°)</span><h3 id="angle">—</h3></div>
+<div class="tile"><span>Max (°)</span><h3 id="max">—</h3></div>
+<div class="tile"><span>Min (°)</span><h3 id="min">—</h3></div>
+<div class="tile"><span>Zero Ref (°)</span><h3 id="zero">—</h3></div>
+</div>
+<div class="flex" style="margin-top:10px;">
+<button id="btnStart" class="btn primary">Start</button>
+<button id="btnStop" class="btn warn">Stop</button>
+<button id="btnSave" class="btn">Save Record</button>
+</div>
+</div>
+
+<div class="card">
+<strong>Records</strong>
+<span class="small muted right" id="count">0 saved</span>
+<div class="separator"></div>
+<div style="overflow:auto">
+<table id="table">
+<thead>
+<tr><th>Time</th><th>Joint/Side</th><th>Plane</th><th>Angle°</th><th>Min°</th><th>Max°</th><th>Notes</th></tr>
+</thead>
+<tbody id="tbody"></tbody>
+</table>
+</div>
+<div class="hint">Data stored locally. No cloud.</div>
+</div>
+
+<p class="muted small">
+Disclaimer: For screening, exercise guidance, documentation. Does not replace clinical judgment.<br>
+Contact: Moustafa Mohammed Elsayed Ali
+</p>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
 (function(){
-  const ui = {
-    angle: document.getElementById('angle'),
-    min: document.getElementById('min'),
-    max: document.getElementById('max'),
-    zero: document.getElementById('zero'),
-    sensorStatus: document.getElementById('sensorStatus'),
-    btnEnable: document.getElementById('btnEnable'),
-    joint: document.getElementById('joint'),
-    plane: document.getElementById('plane'),
-    side: document.getElementById('side'),
-    notes: document.getElementById('notes'),
-    toast: document.getElementById('toast')
-  };
+const ui = {
+angle: document.getElementById('angle'),
+min: document.getElementById('min'),
+max: document.getElementById('max'),
+zero: document.getElementById('zero'),
+sensorStatus: document.getElementById('sensorStatus'),
+btnEnable: document.getElementById('btnEnable'),
+btnStart: document.getElementById('btnStart'),
+btnStop: document.getElementById('btnStop'),
+btnSave: document.getElementById('btnSave'),
+joint: document.getElementById('joint'),
+plane: document.getElementById('plane'),
+side: document.getElementById('side'),
+notes: document.getElementById('notes'),
+tbody: document.getElementById('tbody'),
+count: document.getElementById('count'),
+toast: document.getElementById('toast')
+};
 
-  let running = true;
-  let zero = 0, min = Infinity, max = -Infinity, currentAngle = 0, smoothedAngle = 0, listenerAdded = false, lastTs=0;
+let running=false, zero=0, minAngle=Infinity, maxAngle=-Infinity, currentAngle=0;
+let listenerAdded=false, smoothedAngle=0, smoothing=0.18, lastTs=0;
+const KEY='rom-tracker-records-v1';
 
-  // --- SENSOR ENABLE ---
-  async function enableSensors(){
-    try {
-      if(typeof DeviceMotionEvent!=='undefined' && typeof DeviceMotionEvent.requestPermission==='function'){
-        const res = await DeviceMotionEvent.requestPermission();
-        if(res!=='granted') throw new Error('Denied');
-      }
-      if(typeof DeviceOrientationEvent!=='undefined' && typeof DeviceOrientationEvent.requestPermission==='function'){
-        await DeviceOrientationEvent.requestPermission().catch(()=>{});
-      }
-      showToast('Sensors enabled');
-      if(!listenerAdded){ window.addEventListener('deviceorientation', onOrient, true); listenerAdded=true; }
-      startPeriodicReading();
-      startVoiceCommands();
-    } catch(e){ showToast('Sensors blocked'); }
-  }
-  ui.btnEnable.addEventListener('click', enableSensors);
+function showToast(txt, ms=1200){ui.toast.textContent=txt; ui.toast.style.display='block'; clearTimeout(ui.toast._t); ui.toast._t=setTimeout(()=>ui.toast.style.display='none', ms);}
 
-  function getAxisAngle(a,b,g,p){switch(p){case 'alpha':return((a+540)%360)-180;case 'beta':return b;case 'gamma':return g;}}
-  function onOrient(e){
-    const now=performance.now();
-    if(now-lastTs<40) return;
-    lastTs=now;
-    const a=Number.isFinite(e.alpha)?e.alpha:0;
-    const b=Number.isFinite(e.beta)?e.beta:0;
-    const g=Number.isFinite(e.gamma)?e.gamma:0;
-    let raw=getAxisAngle(a,b,g,ui.plane.value)-zero;
-    let wrapped=((raw+180)%360)-180;
-    smoothedAngle+=0.18*(wrapped-smoothedAngle);
-    currentAngle=smoothedAngle;
-    if(currentAngle>max) max=currentAngle;
-    if(currentAngle<min) min=currentAngle;
-    ui.angle.textContent=currentAngle.toFixed(1);
-    ui.min.textContent=min.toFixed(1);
-    ui.max.textContent=max.toFixed(1);
-  }
+function loadRecords(){try{return JSON.parse(localStorage.getItem(KEY)||'[]');}catch{return[];}}
+function saveRecords(arr){localStorage.setItem(KEY, JSON.stringify(arr));}
+function fmtTime(ts){return new Date(ts).toLocaleString();}
+function uuidv4(){return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0,v=c==='x'?r:(r&0x3|0x8);return v.toString(16);});}
 
-  // --- VOICE COMMAND ---
-  function startVoiceCommands(){
-    if(!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) return;
-    const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-    const r=new SR();
-    r.continuous=true; r.lang='en-US'; r.interimResults=false;
-    r.onresult=(e)=>{
-      const t=e.results[e.results.length-1][0].transcript.toLowerCase();
-      if(t.includes('set zero')){ zero=currentAngle; ui.zero.textContent=zero.toFixed(1); showToast('Zero set via voice'); }
-    };
-    r.onerror=console.log; r.start();
-  }
+function refreshTable(){
+ const data=loadRecords(); ui.count.textContent=`${data.length} saved`; ui.tbody.innerHTML='';
+ data.forEach((r,idx)=>{
+  const tr=document.createElement('tr');
+  const tdTime=document.createElement('td'); tdTime.textContent=fmtTime(r.time);
+  const tdJs=document.createElement('td'); tdJs.textContent=`${r.joint} (${r.side})`;
+  const tdPlane=document.createElement('td'); tdPlane.textContent=r.plane;
+  const tdAngle=document.createElement('td'); tdAngle.textContent=typeof r.angle==='number'?r.angle.toFixed(1):'—';
+  const tdMin=document.createElement('td'); tdMin.textContent=typeof r.min==='number'?r.min.toFixed(1):'—';
+  const tdMax=document.createElement('td'); tdMax.textContent=typeof r.max==='number'?r.max.toFixed(1):'—';
+  const tdNotes=document.createElement('td'); tdNotes.textContent=r.notes||'';
+  tr.append(tdTime,tdJs,tdPlane,tdAngle,tdMin,tdMax,tdNotes); ui.tbody.appendChild(tr);
+ });
+}
+refreshTable();
 
-  // --- PERIODIC READOUT ---
-  function startPeriodicReading(){
-    setInterval(()=>{
-      if(running){
-        const msg=new SpeechSynthesisUtterance(`Angle is ${currentAngle.toFixed(0)} degrees`);
-        window.speechSynthesis.speak(msg);
-      }
-    },10000);
-  }
+function enableSensors(){
+ if(listenerAdded) return;
+ if(typeof DeviceOrientationEvent!=='undefined' && typeof DeviceOrientationEvent.requestPermission==='function'){
+  DeviceOrientationEvent.requestPermission().then(res=>{if(res==='granted'){addListener(); showToast('Sensors enabled'); startPeriodicReading();}else showToast('Permission denied');});
+ }else{addListener(); showToast('Sensors enabled'); startPeriodicReading();}
+}
+function addListener(){window.addEventListener('deviceorientation', onOrient,true); listenerAdded=true;}
+function getAxisAngle(alpha,beta,gamma,plane){switch(plane){case'alpha':return((alpha+540)%360)-180; case'beta':return beta; case'gamma':return gamma;}}
 
-  function showToast(txt,ms=1200){ ui.toast.textContent=txt; ui.toast.style.display='block'; clearTimeout(ui.toast._t); ui.toast._t=setTimeout(()=>ui.toast.style.display='none',ms);}
+function onOrient(e){
+ if(!running) return;
+ const now=performance.now();
+ if(now-lastTs<1000/25) return;
+ lastTs=now;
+ const a=Number.isFinite(e.alpha)?e.alpha:0;
+ const b=Number.isFinite(e.beta)?e.beta:0;
+ const g=Number.isFinite(e.gamma)?e.gamma:0;
+ let raw=getAxisAngle(a,b,g,ui.plane.value)-zero;
+ let wrapped=((raw+180)%360)-180;
+ const jump=Math.abs(wrapped-smoothedAngle);
+ if(jump>120)return;
+ smoothedAngle+=smoothing*(wrapped-smoothedAngle);
+ currentAngle=smoothedAngle;
+ if(currentAngle>maxAngle)maxAngle=currentAngle;
+ if(currentAngle<minAngle)minAngle=currentAngle;
+ ui.angle.textContent=currentAngle.toFixed(1);
+ ui.max.textContent=isFinite(maxAngle)?maxAngle.toFixed(1):'—';
+ ui.min.textContent=isFinite(minAngle)?minAngle.toFixed(1):'—';
+}
+
+function calibrateZero(){zero=currentAngle; ui.zero.textContent=zero.toFixed(1); showToast('Zero set');}
+function saveCurrent(){const rec={id:uuidv4(),time:Date.now(),joint:ui.joint.value,side:ui.side.value,plane:ui.plane.value,angle:Number(currentAngle.toFixed(2)),min:isFinite(minAngle)?Number(minAngle.toFixed(2)):null,max:isFinite(maxAngle)?Number(maxAngle.toFixed(2)):null,notes:ui.notes.value.trim()}; const arr=loadRecords(); arr.unshift(rec); saveRecords(arr); refreshTable(); showToast('Saved');}
+
+ui.btnEnable.addEventListener('click',enableSensors);
+ui.btnStart.addEventListener('click',()=>{running=true; showToast('Measuring');});
+ui.btnStop.addEventListener('click',()=>{running=false; showToast('Stopped');});
+ui.btnSave.addEventListener('click',saveCurrent);
+
+// Voice recognition for "Set Zero"
+if('webkitSpeechRecognition'in window || 'SpeechRecognition'in window){
+ const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+ const recognition=new SpeechRecognition();
+ recognition.continuous=true; recognition.interimResults=false; recognition.lang='en-US';
+ recognition.onresult=function(e){for(let i=e.resultIndex;i<e.results.length;i++){if(e.results[i].isFinal){const cmd=e.results[i][0].transcript.toLowerCase().trim(); if(cmd.includes('set zero')){calibrateZero();}}}};
+ recognition.onerror=function(e){console.log('Voice error',e);}
+ recognition.onend=function(){recognition.start();}
+ recognition.start();
+}
+
+// Periodic 10-second speech
+function startPeriodicReading(){
+ if(window.periodicInterval)return;
+ window.periodicInterval=setInterval(()=>{
+   if(running){
+     const msg=new SpeechSynthesisUtterance(`Angle is ${currentAngle.toFixed(0)} degrees`);
+     window.speechSynthesis.speak(msg);
+   }
+ },10000);
+}
+
 })();
 </script>
 </body>
