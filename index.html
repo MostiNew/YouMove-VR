@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-<title>YouMOVE – Voice & Motion ROM Tracker</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>YouMOVE VR – ROM Tracker</title>
 <style>
 :root { --bg:#0b1016; --card:#121820; --muted:#8aa0b2; --text:#eaf2f8; --accent:#50c878; --danger:#ff6b6b; --warn:#ffc857; --flash:#50c878; }
 *{box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
@@ -13,7 +13,7 @@ header{display:flex;align-items:center;gap:12px;justify-content:space-between;ma
 h1{font-size:22px;margin:0}
 .card{background:var(--card);border:1px solid #1d2732;border-radius:18px;padding:14px;margin:10px 0;box-shadow:0 6px 24px rgba(0,0,0,.28)}
 label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
-select, input[type="text"], button, input[type="number"]{width:100%;padding:12px 12px;border-radius:12px;border:1px solid #203040;background:#0b1118;color:var(--text);font-size:15px}
+select, input[type="text"], input[type="number"], button{width:100%;padding:12px 12px;border-radius:12px;border:1px solid #203040;background:#0b1118;color:var(--text);font-size:15px}
 .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
 .btn{cursor:pointer;transition:transform .02s ease,opacity .2s}
@@ -43,7 +43,7 @@ button:focus{ outline:3px solid rgba(80,200,120,0.18); outline-offset:2px; }
 <body>
 <div class="wrap">
 <header>
-<h1>YouMOVE – Voice & Motion ROM Tracker</h1>
+<h1>YouMOVE VR – ROM Tracker</h1>
 <div class="flex">
 <button id="btnEnable" class="btn ghost">Enable Sensors</button>
 </div>
@@ -66,7 +66,7 @@ button:focus{ outline:3px solid rgba(80,200,120,0.18); outline-offset:2px; }
 </select>
 </div>
 <div>
-<label>Plane</label>
+<label>Plane / Movement</label>
 <select id="plane">
 <option value="beta">Flexion/Extension (β / pitch)</option>
 <option value="gamma">Abduction/Adduction (γ / roll)</option>
@@ -74,6 +74,7 @@ button:focus{ outline:3px solid rgba(80,200,120,0.18); outline-offset:2px; }
 </select>
 </div>
 </div>
+
 <div class="row">
 <div>
 <label>Side</label>
@@ -88,7 +89,18 @@ button:focus{ outline:3px solid rgba(80,200,120,0.18); outline-offset:2px; }
 <input id="notes" type="text" placeholder="e.g., post-op wk 2, pain at end-range">
 </div>
 </div>
-<div class="hint">Say "Set Zero" to calibrate before movement. The system will read angles every 10 seconds automatically.</div>
+
+<div class="row">
+<div>
+<label>Language (for speech)</label>
+<select id="language">
+<option value="en-US">English</option>
+<option value="de-DE">Deutsch</option>
+<option value="es-ES">Español</option>
+</select>
+</div>
+</div>
+
 </div>
 
 <div class="card">
@@ -102,27 +114,28 @@ button:focus{ outline:3px solid rgba(80,200,120,0.18); outline-offset:2px; }
 <button id="btnStart" class="btn primary">Start</button>
 <button id="btnStop" class="btn warn">Stop</button>
 <button id="btnSave" class="btn">Save Record</button>
+<button id="btnExport" class="btn">Export CSV</button>
+<span class="pill right" id="sensorStatus">Sensors: idle</span>
 </div>
+<div class="hint">Place the phone on distal segment. Say "Set Zero" to calibrate just before movement.</div>
 </div>
 
 <div class="card">
-<strong>Records</strong>
-<span class="small muted right" id="count">0 saved</span>
+<strong>Records</strong> <span class="small muted right" id="count">0 saved</span>
 <div class="separator"></div>
 <div style="overflow:auto">
 <table id="table">
 <thead>
-<tr><th>Time</th><th>Joint/Side</th><th>Plane</th><th>Angle°</th><th>Min°</th><th>Max°</th><th>Notes</th></tr>
+<tr><th>Time</th><th>Joint/Side</th><th>Plane</th><th>Angle°</th><th>Min°</th><th>Max°</th><th>Notes</th><th></th></tr>
 </thead>
 <tbody id="tbody"></tbody>
 </table>
 </div>
-<div class="hint">Data stored locally. No cloud.</div>
+<div class="hint">Stored locally in browser (LocalStorage). No cloud.</div>
 </div>
 
-<p class="muted small">
-Disclaimer: For screening, exercise guidance, documentation. Does not replace clinical judgment.<br>
-Contact: Moustafa Mohammed Elsayed Ali
+<p class="muted small" style="margin-top:12px;">
+Disclaimer: For screening, exercise guidance, and documentation support. Not a replacement for clinical judgment. Contact: Moustafa Ali – <a href="mailto:mostischmidbauer@web.de">Email</a>
 </p>
 </div>
 
@@ -140,101 +153,131 @@ btnEnable: document.getElementById('btnEnable'),
 btnStart: document.getElementById('btnStart'),
 btnStop: document.getElementById('btnStop'),
 btnSave: document.getElementById('btnSave'),
+btnExport: document.getElementById('btnExport'),
 joint: document.getElementById('joint'),
 plane: document.getElementById('plane'),
 side: document.getElementById('side'),
 notes: document.getElementById('notes'),
 tbody: document.getElementById('tbody'),
 count: document.getElementById('count'),
+language: document.getElementById('language'),
 toast: document.getElementById('toast')
 };
 
-let running=false, zero=0, minAngle=Infinity, maxAngle=-Infinity, currentAngle=0;
-let listenerAdded=false, smoothedAngle=0, smoothing=0.18, lastTs=0;
-const KEY='rom-tracker-records-v1';
+let running=false,zero=0,min=Infinity,max=-Infinity,currentAngle=0,listenerAdded=false;
+let recordsKey='rom-tracker-records-v1';
+let speechInterval=null;
 
-function showToast(txt, ms=1200){ui.toast.textContent=txt; ui.toast.style.display='block'; clearTimeout(ui.toast._t); ui.toast._t=setTimeout(()=>ui.toast.style.display='none', ms);}
+function showToast(txt,ms=1200){ ui.toast.textContent=txt; ui.toast.style.display='block'; clearTimeout(ui.toast._t); ui.toast._t=setTimeout(()=>ui.toast.style.display='none',ms); }
 
-function loadRecords(){try{return JSON.parse(localStorage.getItem(KEY)||'[]');}catch{return[];}}
-function saveRecords(arr){localStorage.setItem(KEY, JSON.stringify(arr));}
-function fmtTime(ts){return new Date(ts).toLocaleString();}
-function uuidv4(){return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0,v=c==='x'?r:(r&0x3|0x8);return v.toString(16);});}
-
-function refreshTable(){
+function loadRecords(){ try{return JSON.parse(localStorage.getItem(recordsKey)||'[]')}catch{return[]} }
+function saveRecords(arr){ localStorage.setItem(recordsKey,JSON.stringify(arr)) }
+function refreshTable(){ 
  const data=loadRecords(); ui.count.textContent=`${data.length} saved`; ui.tbody.innerHTML='';
  data.forEach((r,idx)=>{
   const tr=document.createElement('tr');
-  const tdTime=document.createElement('td'); tdTime.textContent=fmtTime(r.time);
+  ['time','jointSide','plane','angle','min','max','notes','del'].forEach(k=>{});
+  const tdTime=document.createElement('td'); tdTime.textContent=new Date(r.time).toLocaleString();
   const tdJs=document.createElement('td'); tdJs.textContent=`${r.joint} (${r.side})`;
   const tdPlane=document.createElement('td'); tdPlane.textContent=r.plane;
-  const tdAngle=document.createElement('td'); tdAngle.textContent=typeof r.angle==='number'?r.angle.toFixed(1):'—';
-  const tdMin=document.createElement('td'); tdMin.textContent=typeof r.min==='number'?r.min.toFixed(1):'—';
-  const tdMax=document.createElement('td'); tdMax.textContent=typeof r.max==='number'?r.max.toFixed(1):'—';
+  const tdAngle=document.createElement('td'); tdAngle.textContent=isFinite(r.angle)?r.angle.toFixed(1):'—';
+  const tdMin=document.createElement('td'); tdMin.textContent=isFinite(r.min)?r.min.toFixed(1):'—';
+  const tdMax=document.createElement('td'); tdMax.textContent=isFinite(r.max)?r.max.toFixed(1):'—';
   const tdNotes=document.createElement('td'); tdNotes.textContent=r.notes||'';
-  tr.append(tdTime,tdJs,tdPlane,tdAngle,tdMin,tdMax,tdNotes); ui.tbody.appendChild(tr);
+  const tdDel=document.createElement('td');
+  const btnDel=document.createElement('button'); btnDel.className='btn small danger'; btnDel.textContent='Delete';
+  btnDel.addEventListener('click',()=>{if(confirm('Delete record?')){ const arr=loadRecords(); arr.splice(idx,1); saveRecords(arr); refreshTable(); showToast('Deleted');}});
+  tdDel.appendChild(btnDel);
+  tr.append(tdTime,tdJs,tdPlane,tdAngle,tdMin,tdMax,tdNotes,tdDel);
+  ui.tbody.appendChild(tr);
  });
 }
 refreshTable();
 
-function enableSensors(){
- if(listenerAdded) return;
- if(typeof DeviceOrientationEvent!=='undefined' && typeof DeviceOrientationEvent.requestPermission==='function'){
-  DeviceOrientationEvent.requestPermission().then(res=>{if(res==='granted'){addListener(); showToast('Sensors enabled'); startPeriodicReading();}else showToast('Permission denied');});
- }else{addListener(); showToast('Sensors enabled'); startPeriodicReading();}
+function isIOS(){ return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1); }
+
+async function enableSensors(){
+ try{
+  if(isIOS() && typeof DeviceMotionEvent!=='undefined' && typeof DeviceMotionEvent.requestPermission==='function'){
+   const res=await DeviceMotionEvent.requestPermission();
+   if(res!=='granted') throw new Error('Permission denied');
+  }
+  if(typeof DeviceOrientationEvent!=='undefined' && typeof DeviceOrientationEvent.requestPermission==='function'){
+   try{await DeviceOrientationEvent.requestPermission()}catch(e){}
+  }
+  ui.sensorStatus.textContent='Sensors: ready'; if(!listenerAdded){window.addEventListener('deviceorientation',onOrient,true); listenerAdded=true;}
+  showToast('Sensors enabled'); startVoice();
+ }catch(err){ui.sensorStatus.textContent='Sensors: blocked'; showToast('Permission denied — use voice');}
 }
-function addListener(){window.addEventListener('deviceorientation', onOrient,true); listenerAdded=true;}
-function getAxisAngle(alpha,beta,gamma,plane){switch(plane){case'alpha':return((alpha+540)%360)-180; case'beta':return beta; case'gamma':return gamma;}}
+
+function getAxisAngle(alpha,beta,gamma,plane){ switch(plane){ case'alpha': return ((alpha+540)%360)-180; case'beta': return beta; case'gamma': return gamma; } return 0; }
 
 function onOrient(e){
  if(!running) return;
- const now=performance.now();
- if(now-lastTs<1000/25) return;
- lastTs=now;
  const a=Number.isFinite(e.alpha)?e.alpha:0;
  const b=Number.isFinite(e.beta)?e.beta:0;
  const g=Number.isFinite(e.gamma)?e.gamma:0;
  let raw=getAxisAngle(a,b,g,ui.plane.value)-zero;
  let wrapped=((raw+180)%360)-180;
- const jump=Math.abs(wrapped-smoothedAngle);
- if(jump>120)return;
- smoothedAngle+=smoothing*(wrapped-smoothedAngle);
- currentAngle=smoothedAngle;
- if(currentAngle>maxAngle)maxAngle=currentAngle;
- if(currentAngle<minAngle)minAngle=currentAngle;
+ currentAngle=wrapped;
+ if(currentAngle>max) max=currentAngle;
+ if(currentAngle<min) min=currentAngle;
  ui.angle.textContent=currentAngle.toFixed(1);
- ui.max.textContent=isFinite(maxAngle)?maxAngle.toFixed(1):'—';
- ui.min.textContent=isFinite(minAngle)?minAngle.toFixed(1):'—';
+ ui.max.textContent=isFinite(max)?max.toFixed(1):'—';
+ ui.min.textContent=isFinite(min)?min.toFixed(1):'—';
 }
 
-function calibrateZero(){zero=currentAngle; ui.zero.textContent=zero.toFixed(1); showToast('Zero set');}
-function saveCurrent(){const rec={id:uuidv4(),time:Date.now(),joint:ui.joint.value,side:ui.side.value,plane:ui.plane.value,angle:Number(currentAngle.toFixed(2)),min:isFinite(minAngle)?Number(minAngle.toFixed(2)):null,max:isFinite(maxAngle)?Number(maxAngle.toFixed(2)):null,notes:ui.notes.value.trim()}; const arr=loadRecords(); arr.unshift(rec); saveRecords(arr); refreshTable(); showToast('Saved');}
-
 ui.btnEnable.addEventListener('click',enableSensors);
-ui.btnStart.addEventListener('click',()=>{running=true; showToast('Measuring');});
-ui.btnStop.addEventListener('click',()=>{running=false; showToast('Stopped');});
-ui.btnSave.addEventListener('click',saveCurrent);
+ui.btnStart.addEventListener('click',()=>{running=true; ui.sensorStatus.textContent='Measuring…'; showToast('Started');});
+ui.btnStop.addEventListener('click',()=>{running=false; ui.sensorStatus.textContent='Stopped'; showToast('Stopped');});
 
-// Voice recognition for "Set Zero"
-if('webkitSpeechRecognition'in window || 'SpeechRecognition'in window){
- const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
- const recognition=new SpeechRecognition();
- recognition.continuous=true; recognition.interimResults=false; recognition.lang='en-US';
- recognition.onresult=function(e){for(let i=e.resultIndex;i<e.results.length;i++){if(e.results[i].isFinal){const cmd=e.results[i][0].transcript.toLowerCase().trim(); if(cmd.includes('set zero')){calibrateZero();}}}};
- recognition.onerror=function(e){console.log('Voice error',e);}
- recognition.onend=function(){recognition.start();}
+function saveCurrentRecord(){
+ const rec={time:Date.now(),joint:ui.joint.value,side:ui.side.value,plane:ui.plane.options[ui.plane.selectedIndex].text,angle:currentAngle,min:min,max:max,notes:ui.notes.value.trim()};
+ const arr=loadRecords(); arr.unshift(rec); saveRecords(arr); refreshTable();
+ showToast('Saved');
+}
+ui.btnSave.addEventListener('click',saveCurrentRecord);
+
+ui.btnExport.addEventListener('click',()=>{
+ const data=loadRecords();
+ if(!data.length){ showToast('No records'); return; }
+ const header=['time_iso','joint','side','plane','angle_deg','min_deg','max_deg','notes'];
+ const lines=[header.join(',')];
+ data.forEach(r=>{
+  const row=[new Date(r.time).toISOString(),r.joint,r.side,`"${r.plane}"`,r.angle.toFixed(2),r.min.toFixed(2),r.max.toFixed(2),`"${(r.notes||'').replace(/"/g,'""')}"`];
+  lines.push(row.join(','));
+ });
+ const bom='\uFEFF'; const blob=new Blob([bom+lines.join('\n')],{type:'text/csv;charset=utf-8;'});
+ const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='rom-tracker.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+ showToast('Exported');
+});
+
+// Voice recognition for "set zero"
+let recognition=null;
+function startVoice(){
+ if(!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) return;
+ const SpeechRecognition = window.SpeechRecognition||window.webkitSpeechRecognition;
+ recognition=new SpeechRecognition();
+ recognition.continuous=true; recognition.interimResults=false;
+ recognition.onresult=(event)=>{
+  const last=event.results[event.results.length-1][0].transcript.trim().toLowerCase();
+  if(last.includes('set zero')||last.includes('nullpunkt')||last.includes('punto cero')){
+   zero=currentAngle; ui.zero.textContent=zero.toFixed(1); showToast('Zero set via voice');
+  }
+ };
  recognition.start();
 }
 
-// Periodic 10-second speech
-function startPeriodicReading(){
- if(window.periodicInterval)return;
- window.periodicInterval=setInterval(()=>{
-   if(running){
-     const msg=new SpeechSynthesisUtterance(`Angle is ${currentAngle.toFixed(0)} degrees`);
-     window.speechSynthesis.speak(msg);
-   }
- },10000);
+// Speech angle every 10 seconds
+function speakAngle(){
+ if(!running || !isFinite(currentAngle)) return;
+ const msg=new SpeechSynthesisUtterance(); const lang=ui.language.value;
+ if(lang==='en-US') msg.text=`Angle is ${currentAngle.toFixed(1)} degrees`;
+ else if(lang==='de-DE') msg.text=`Winkel beträgt ${currentAngle.toFixed(1)} Grad`;
+ else if(lang==='es-ES') msg.text=`El ángulo es ${currentAngle.toFixed(1)} grados`;
+ msg.lang=lang; window.speechSynthesis.speak(msg);
 }
+setInterval(speakAngle,10000);
 
 })();
 </script>
