@@ -2,10 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>YouMOVE VR – ROM Tracker</title>
+<link rel="manifest" href="manifest.json">
+
 <style>
 body{font-family:system-ui;background:#0b1016;color:#eaf2f8;margin:0;padding:20px}
+h2{margin-bottom:16px}
 .card{background:#121820;padding:16px;border-radius:14px;margin-bottom:12px}
 button,select{padding:10px;border-radius:8px;border:none;margin:4px}
 button{background:#50c878;color:#072d19;font-weight:bold;cursor:pointer}
@@ -14,9 +17,9 @@ table{width:100%;border-collapse:collapse}
 td,th{border-bottom:1px solid #203040;padding:8px}
 </style>
 </head>
-<body>
 
-<h2>YouMOVE – ROM Tracker</h2>
+<body>
+<h2>YouMOVE VR – ROM Tracker</h2>
 
 <div class="card">
 Joint
@@ -48,21 +51,15 @@ Language
 
 <div class="card">
 <div class="kpi">
-<div>Angle <span id="angle">0</span>°</div>
-<div>Min <span id="min">0</span>°</div>
-<div>Max <span id="max">0</span>°</div>
+<div>Angle <span id="angle">0.0</span>°</div>
+<div>Min <span id="min">0.0</span></div>
+<div>Max <span id="max">0.0</span></div>
 </div>
 
 <button id="enableBtn">Enable Sensors</button>
-<button id="zeroBtn">Set Zero</button>
-<button id="voiceBtn">Enable Voice Commands</button>
 <button id="startBtn">Start</button>
 <button id="stopBtn">Stop</button>
-<button id="saveBtn">Save</button>
-</div>
-
-<div class="card">
-<button id="csvBtn">Export CSV</button>
+<button id="saveBtn">Save & Auto Export</button>
 </div>
 
 <div class="card">
@@ -78,19 +75,25 @@ Language
 </table>
 </div>
 
-<script>
-let running=false;
-let zero=0;
-let currentAngle=0;
-let min=999;
-let max=-999;
-let sessionData=[];
-let captureInterval;
-let speechInterval;
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
-const angleEl=document.getElementById("angle");
-const minEl=document.getElementById("min");
-const maxEl=document.getElementById("max");
+<script>
+let running=false, zero=0, currentAngle=0, min=999, max=-999;
+let sessionData=[], captureInterval, speechInterval;
+
+const angleEl=document.getElementById("angle"),
+      minEl=document.getElementById("min"),
+      maxEl=document.getElementById("max"),
+      recordsEl=document.getElementById("records");
+
+function render(){
+  recordsEl.innerHTML="";
+  sessionData.forEach(r=>{
+    const row=document.createElement("tr");
+    row.innerHTML=`<td>${r.time}</td><td>${r.angle.toFixed(1)}</td>`;
+    recordsEl.appendChild(row);
+  });
+}
 
 function speakAngle(){
   const lang=document.getElementById("language").value;
@@ -98,125 +101,112 @@ function speakAngle(){
   if(lang==="en") text=`Angle ${currentAngle.toFixed(1)} degrees`;
   if(lang==="de") text=`Winkel ${currentAngle.toFixed(1)} Grad`;
   if(lang==="es") text=`Ángulo ${currentAngle.toFixed(1)} grados`;
-  const msg=new SpeechSynthesisUtterance(text);
-  speechSynthesis.speak(msg);
+  speechSynthesis.speak(new SpeechSynthesisUtterance(text));
 }
 
 function startSpeech(){
-  speechInterval=setInterval(()=>{
-    if(running) speakAngle();
-  },10000);
+  speechInterval=setInterval(()=>{ if(running) speakAngle(); },10000);
 }
 
 function startCapture(){
   sessionData=[];
   captureInterval=setInterval(()=>{
-    sessionData.push({
-      time:new Date().toLocaleTimeString(),
-      angle:currentAngle
-    });
+    sessionData.push({time:new Date().toLocaleTimeString(), angle:currentAngle});
     render();
   },5000);
 }
 
-function stopCapture(){
-  clearInterval(captureInterval);
+function stopCapture(){ clearInterval(captureInterval); }
+
+function startOrientationListener(){
+  window.addEventListener("deviceorientation", e=>{
+    if(!running) return;
+    let val=0, plane=document.getElementById("plane").value;
+    if(plane==="alpha") val=e.alpha||0;
+    if(plane==="beta") val=e.beta||0;
+    if(plane==="gamma") val=e.gamma||0;
+    currentAngle=val-zero;
+    if(currentAngle>max) max=currentAngle;
+    if(currentAngle<min) min=currentAngle;
+    angleEl.innerText=currentAngle.toFixed(1);
+    minEl.innerText=min.toFixed(1);
+    maxEl.innerText=max.toFixed(1);
+  }, true);
 }
 
-function render(){
-  const table=document.getElementById("records");
-  table.innerHTML="";
-  sessionData.forEach(r=>{
-    let row=document.createElement("tr");
-    row.innerHTML=`<td>${r.time}</td><td>${r.angle.toFixed(1)}</td>`;
-    table.appendChild(row);
-  });
-}
-
-// Enable sensors
-document.getElementById("enableBtn").onclick=()=>{
-  if(typeof DeviceOrientationEvent!=="undefined"){
-    window.addEventListener("deviceorientation", e=>{
-      if(!running) return;
-      let val=0;
-      const plane=document.getElementById("plane").value;
-      if(plane==="alpha") val=e.alpha||0;
-      if(plane==="beta") val=e.beta||0;
-      if(plane==="gamma") val=e.gamma||0;
-      currentAngle=val-zero;
-      if(currentAngle>max) max=currentAngle;
-      if(currentAngle<min) min=currentAngle;
-      angleEl.innerText=currentAngle.toFixed(1);
-      minEl.innerText=min.toFixed(1);
-      maxEl.innerText=max.toFixed(1);
-    }, true);
-    alert("✅ Sensors enabled! Place phone on distal segment.");
-  } else {
-    alert("Device orientation not supported.");
-  }
+// Button events
+document.getElementById("enableBtn").onclick=async ()=>{
+  if(typeof DeviceOrientationEvent !== "undefined" &&
+     typeof DeviceOrientationEvent.requestPermission === "function"){
+    try{
+      const res = await DeviceOrientationEvent.requestPermission();
+      if(res==="granted") startOrientationListener();
+      else alert("Permission denied for sensors");
+    }catch(err){ alert("Error: "+err); }
+  } else startOrientationListener();
 };
 
-// Manual zero calibration (works on all devices)
-document.getElementById("zeroBtn").onclick=()=>{
-  zero=currentAngle;
-  min=currentAngle;
-  max=currentAngle;
-  angleEl.innerText=currentAngle.toFixed(1);
-  minEl.innerText=min.toFixed(1);
-  maxEl.innerText=max.toFixed(1);
-  alert("✅ Zero calibrated manually!");
-};
-
-// Voice commands for "Set Zero" (Chrome/Android)
-document.getElementById("voiceBtn").onclick=()=>{
-  if('webkitSpeechRecognition' in window){
-    const rec=new webkitSpeechRecognition();
-    rec.continuous=true;
-    rec.lang='en-US';
-    rec.onresult=e=>{
-      const txt=e.results[e.results.length-1][0].transcript.toLowerCase();
-      if(txt.includes("set zero")){
-        zero=currentAngle;
-        min=currentAngle;
-        max=currentAngle;
-        angleEl.innerText=currentAngle.toFixed(1);
-        minEl.innerText=min.toFixed(1);
-        maxEl.innerText=max.toFixed(1);
-        alert("✅ Zero calibrated via voice!");
-      }
-    };
-    rec.start();
-    alert("Voice commands enabled. Say 'Set Zero' now!");
-  } else {
-    alert("Speech recognition not supported on this device.");
-  }
-};
-
-document.getElementById("startBtn").onclick=()=>{
-  running=true;
-  startCapture();
-  startSpeech();
-};
-
+document.getElementById("startBtn").onclick=()=>{ running=true; startCapture(); startSpeech(); };
 document.getElementById("stopBtn").onclick=()=>{
   running=false;
   stopCapture();
   clearInterval(speechInterval);
+  analyzeMovement();
 };
-
 document.getElementById("saveBtn").onclick=()=>{
-  alert(`Saved ${sessionData.length} records.`);
+  exportCSV(); exportPDF(); alert("Session exported!");
 };
 
-document.getElementById("csvBtn").onclick=()=>{
+// Movement analysis
+function analyzeMovement(){
+  if(sessionData.length<2) return alert("Not enough data");
+  let diffs=[];
+  for(let i=1;i<sessionData.length;i++) diffs.push(Math.abs(sessionData[i].angle-sessionData[i-1].angle));
+  let avg=diffs.reduce((a,b)=>a+b,0)/diffs.length;
+  let result="";
+  if(avg<2) result="Very smooth movement";
+  else if(avg<5) result="Normal movement";
+  else result="Irregular movement";
+  alert("Movement Quality: "+result);
+}
+
+// PDF
+function exportPDF(){
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF();
+  doc.text("YouMOVE Clinical Report",20,20);
+  doc.text("Joint: "+document.getElementById("joint").value,20,40);
+  doc.text("Max ROM: "+max.toFixed(1),20,50);
+  doc.text("Min ROM: "+min.toFixed(1),20,60);
+  sessionData.forEach((r,i)=>doc.text(`${r.time}: ${r.angle.toFixed(1)}°`,20,70+6*i));
+  doc.save("YouMOVE_Report.pdf");
+}
+
+// CSV
+function exportCSV(){
   let csv="time,angle\n";
-  sessionData.forEach(r=>{ csv+=`${r.time},${r.angle}\n`; });
+  sessionData.forEach(r=>csv+=`${r.time},${r.angle}\n`);
   let blob=new Blob([csv]);
   let a=document.createElement("a");
   a.href=URL.createObjectURL(blob);
   a.download="session.csv";
   a.click();
-};
+}
+
+// Voice zero calibration
+if('webkitSpeechRecognition' in window || 'SpeechRecognition' in window){
+  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const rec=new SpeechRec();
+  rec.continuous=true;
+  rec.onresult=e=>{
+    const txt=e.results[e.results.length-1][0].transcript.toLowerCase();
+    if(txt.includes("set zero")){ zero=currentAngle; alert("Zero calibrated"); }
+  };
+  rec.start();
+}
+
+// Optional: PWA service worker
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('service-worker.js'); }
 </script>
 </body>
 </html>
