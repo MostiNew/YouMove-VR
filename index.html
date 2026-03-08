@@ -1,10 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>YouMOVE AI</title>
 
 <style>
@@ -12,7 +10,8 @@
 body{
 background:#0F172A;
 color:#E2E8F0;
-font-family:Arial;
+font-family:Arial, sans-serif;
+margin:0;
 display:flex;
 justify-content:center;
 }
@@ -31,7 +30,7 @@ margin-bottom:20px;
 .card{
 background:#1E293B;
 padding:20px;
-margin:10px 0;
+margin:12px 0;
 border-radius:16px;
 text-align:center;
 box-shadow:0 10px 25px rgba(0,0,0,0.4);
@@ -48,9 +47,9 @@ padding:12px;
 margin:6px;
 border:none;
 border-radius:8px;
+font-weight:bold;
 background:#22C55E;
 color:#022c22;
-font-weight:bold;
 }
 
 button:hover{
@@ -83,7 +82,6 @@ color:#94A3B8;
 }
 
 </style>
-
 </head>
 
 <body>
@@ -105,8 +103,12 @@ color:#94A3B8;
 <button onclick="enableSensors()">Enable Sensors</button>
 <button onclick="enableVoice()">Enable Voice</button>
 
+<br>
+
 <button class="secondary" onclick="startSession()">Start</button>
 <button class="warning" onclick="stopSession()">Stop</button>
+
+<br>
 
 <button onclick="setZero()">Set Zero</button>
 
@@ -131,18 +133,20 @@ color:#94A3B8;
 <div class="card">
 
 <button onclick="exportCSV()">Export CSV</button>
-
 <button onclick="sendEmail()">Send Email</button>
-
 <button onclick="sendWhatsApp()">Send WhatsApp</button>
 
 </div>
 
 <div class="card small">
 
-This tool is for RMP and Outcomes measurement and continuity of care  tracking purposes.  
-It does not replace medical diagnosis or clinical assessment, All Right reserved for developer Physocal Therapist Mr. Moustafa Ali Msc.DPT for more ters and conditions email dptmostafa@gmail.com
-  mostischmidbauer@web.de
+This tool is for RMP and outcomes measurement and continuity of care tracking purposes.  
+It does not replace medical diagnosis or clinical assessment.  
+All rights reserved for developer Physiotherapist Mr. Moustafa Ali MSc.Medical informatics and DPT  
+
+Contact  
+dptmostafa@gmail.com  
+mostischmidbauer@web.de
 
 </div>
 
@@ -153,27 +157,23 @@ It does not replace medical diagnosis or clinical assessment, All Right reserved
 let running=false
 let zero=0
 let angle=0
-
 let min=999
 let max=-999
-
 let data=[]
-let interval
+let interval=null
+let recognition=null
 
 function enableSensors(){
 
-if(!/Android/i.test(navigator.userAgent)){
-alert("Android phone required")
-return
-}
-
 window.addEventListener("deviceorientation",e=>{
 
+if(e.beta===null) return
+
+angle = e.beta - zero
+
+document.getElementById("angle").innerText = angle.toFixed(1) + "°"
+
 if(!running) return
-
-angle=(e.beta-zero)
-
-document.getElementById("angle").innerText=angle.toFixed(1)+"°"
 
 if(angle>max) max=angle
 if(angle<min) min=angle
@@ -189,7 +189,11 @@ alert("Sensors enabled")
 
 function startSession(){
 
+if(running) return
+
 running=true
+
+clearInterval(interval)
 
 interval=setInterval(()=>{
 
@@ -197,7 +201,7 @@ data.push(angle)
 
 updateTable()
 
-speak()
+speak("Angle " + angle.toFixed(1) + " degrees")
 
 },5000)
 
@@ -206,6 +210,7 @@ speak()
 function stopSession(){
 
 running=false
+
 clearInterval(interval)
 
 analyzeAI()
@@ -214,19 +219,27 @@ analyzeAI()
 
 function setZero(){
 
-zero=angle
-min=0
-max=0
+zero = angle
 
-alert("Zero set")
+min = 0
+max = 0
+
+data=[]
+
+document.getElementById("min").innerText="0"
+document.getElementById("max").innerText="0"
+document.getElementById("table").innerHTML=""
+
+speak("Zero calibrated")
 
 }
 
-function speak(){
+function speak(text){
 
-let msg=new SpeechSynthesisUtterance("Angle "+angle.toFixed(1)+" degrees")
+let msg = new SpeechSynthesisUtterance(text)
 
 msg.lang="en-US"
+msg.rate=0.9
 
 speechSynthesis.cancel()
 speechSynthesis.speak(msg)
@@ -237,21 +250,22 @@ function updateTable(){
 
 let table=document.getElementById("table")
 
-table.innerHTML=""
+let row=document.createElement("tr")
 
-data.forEach((v,i)=>{
+row.innerHTML="<td>"+data.length+"</td><td>"+angle.toFixed(1)+"</td>"
 
-table.innerHTML+=`<tr><td>${i}</td><td>${v.toFixed(1)}</td></tr>`
-
-})
+table.appendChild(row)
 
 }
 
 function analyzeAI(){
 
 if(data.length<3){
+
 document.getElementById("ai").innerText="Not enough data"
+
 return
+
 }
 
 let diff=[]
@@ -294,54 +308,59 @@ a.click()
 
 function sendEmail(){
 
-let text=`YouMOVE Session
+let text="YouMOVE Session\n\nMax ROM: "+max.toFixed(1)+"\nMin ROM: "+min.toFixed(1)+"\n\nAI Result: "+document.getElementById("ai").innerText
 
-Max ROM: ${max.toFixed(1)}
-Min ROM: ${min.toFixed(1)}
-
-AI Result: ${document.getElementById("ai").innerText}`
-
-window.location.href=`mailto:?subject=YouMOVE Report&body=${encodeURIComponent(text)}`
+window.location.href="mailto:?subject=YouMOVE Report&body="+encodeURIComponent(text)
 
 }
 
 function sendWhatsApp(){
 
-let text=`YouMOVE Session
+let text="YouMOVE Session\n\nMax ROM: "+max.toFixed(1)+"\nMin ROM: "+min.toFixed(1)+"\n\nAI Result: "+document.getElementById("ai").innerText
 
-Max ROM: ${max.toFixed(1)}
-Min ROM: ${min.toFixed(1)}
-
-AI Result: ${document.getElementById("ai").innerText}`
-
-window.open(`https://wa.me/?text=${encodeURIComponent(text)}`)
+window.open("https://wa.me/?text="+encodeURIComponent(text))
 
 }
 
 function enableVoice(){
 
-const Speech=window.SpeechRecognition||window.webkitSpeechRecognition
+const Speech = window.SpeechRecognition || window.webkitSpeechRecognition
 
 if(!Speech){
-alert("Voice not supported")
+
+alert("Voice recognition not supported")
+
 return
+
 }
 
-let rec=new Speech()
+recognition = new Speech()
 
-rec.continuous=true
+recognition.lang="en-US"
+recognition.continuous=true
+recognition.interimResults=false
 
-rec.onresult=e=>{
+recognition.onresult=function(e){
 
 let txt=e.results[e.results.length-1][0].transcript.toLowerCase()
 
-if(txt.includes("zero")) setZero()
+console.log("Voice:",txt)
+
+if(txt.includes("zero") || txt.includes("reset")) setZero()
+
 if(txt.includes("start")) startSession()
+
 if(txt.includes("stop")) stopSession()
 
 }
 
-rec.start()
+recognition.onend=function(){
+
+recognition.start()
+
+}
+
+recognition.start()
 
 alert("Voice commands enabled")
 
