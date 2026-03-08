@@ -1,234 +1,352 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
+
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>YouMOVE Andriod VR</title>
-<link rel="manifest" href="manifest.json">
+
+<title>YouMOVE AI</title>
+
 <style>
-body{font-family:'Segoe UI',sans-serif;background:#0d1117;color:#e0e8f0;margin:0;padding:20px}
-h2,h3{margin:0 0 12px 0}
-.card{background:#161b22;padding:18px;border-radius:16px;margin-bottom:16px;box-shadow:0 4px 12px rgba(0,0,0,0.4)}
-button,select{padding:10px 14px;border-radius:8px;border:none;margin:4px;font-weight:bold;cursor:pointer}
-button{background:#50c878;color:#0b1e0b;transition:0.3s}
-button:hover{background:#3da260}
-.kpi{display:flex;gap:20px;font-size:22px;margin-bottom:8px}
-table{width:100%;border-collapse:collapse}
-td,th{border-bottom:1px solid #203040;padding:8px;text-align:center}
-.disclaimer{font-size:12px;color:#888;margin-top:12px}
-.btn-share{background:#3b82f6;color:white}
-.btn-share:hover{background:#2563eb}
+
+body{
+background:#0F172A;
+color:#E2E8F0;
+font-family:Arial;
+display:flex;
+justify-content:center;
+}
+
+.container{
+max-width:420px;
+width:100%;
+padding:20px;
+}
+
+h1{
+text-align:center;
+margin-bottom:20px;
+}
+
+.card{
+background:#1E293B;
+padding:20px;
+margin:10px 0;
+border-radius:16px;
+text-align:center;
+box-shadow:0 10px 25px rgba(0,0,0,0.4);
+}
+
+.angle{
+font-size:64px;
+font-weight:bold;
+color:#22C55E;
+}
+
+button{
+padding:12px;
+margin:6px;
+border:none;
+border-radius:8px;
+background:#22C55E;
+color:#022c22;
+font-weight:bold;
+}
+
+button:hover{
+background:#16a34a;
+}
+
+.secondary{
+background:#3B82F6;
+color:white;
+}
+
+.warning{
+background:#EF4444;
+color:white;
+}
+
+table{
+width:100%;
+margin-top:10px;
+}
+
+td{
+padding:6px;
+border-bottom:1px solid #334155;
+}
+
+.small{
+font-size:12px;
+color:#94A3B8;
+}
+
 </style>
+
 </head>
+
 <body>
 
-<h2>YouMOVE – ROM Tracker</h2>
+<div class="container">
+
+<h1>YouMOVE AI</h1>
 
 <div class="card">
-<label>Joint:</label>
-<select id="joint">
-<option>Shoulder</option>
-<option>Elbow</option>
-<option>Wrist</option>
-<option>Hip</option>
-<option>Knee</option>
-<option>Ankle</option>
-<option>Cervical Spine</option>
-<option>Lumbar Spine</option>
-</select>
 
-<label>Plane:</label>
-<select id="plane">
-<option value="beta">Flexion/Extension</option>
-<option value="gamma">Abduction</option>
-<option value="alpha">Rotation</option>
-</select>
+<div class="angle" id="angle">0.0°</div>
 
-<label>Language:</label>
-<select id="language">
-<option value="en">English</option>
-<option value="de">Deutsch</option>
-<option value="es">Español</option>
-</select>
+<p>Min: <span id="min">0</span> | Max: <span id="max">0</span></p>
+
 </div>
 
 <div class="card">
-<div class="kpi">
-<div>Angle <span id="angle">0</span>°</div>
-<div>Min <span id="min">0</span></div>
-<div>Max <span id="max">0</span></div>
-</div>
 
-<button id="enableBtn">Enable Sensors</button>
-<button id="startBtn">Start</button>
-<button id="stopBtn">Stop</button>
-<button id="saveBtn">Save</button>
-</div>
+<button onclick="enableSensors()">Enable Sensors</button>
+<button onclick="enableVoice()">Enable Voice</button>
 
-<div class="card">
-<button id="pdfBtn">Generate PDF Report</button>
-<button id="csvBtn">Export CSV</button>
-<button class="btn-share" onclick="sendEmail()">Send via Email</button>
-<button class="btn-share" onclick="sendWhatsApp()">Send via WhatsApp</button>
+<button class="secondary" onclick="startSession()">Start</button>
+<button class="warning" onclick="stopSession()">Stop</button>
+
+<button onclick="setZero()">Set Zero</button>
+
 </div>
 
 <div class="card">
-<h3>Session Records</h3>
-<table>
-<thead>
-<tr><th>Time</th><th>Angle</th></tr>
-</thead>
-<tbody id="records"></tbody>
-</table>
+
+<h3>AI Feedback</h3>
+
+<p id="ai">Waiting for session...</p>
+
 </div>
 
-<div class="disclaimer">
-⚠️ Disclaimer: This tool is for RPM purposes only. Always consult your healthcare professional for diagnosis or treatment All Rights Reserved for developper Ali, Moustafa mostischmidbauer@web.de 
+<div class="card">
+
+<h3>Session Data</h3>
+
+<table id="table"></table>
+
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<div class="card">
+
+<button onclick="exportCSV()">Export CSV</button>
+
+<button onclick="sendEmail()">Send Email</button>
+
+<button onclick="sendWhatsApp()">Send WhatsApp</button>
+
+</div>
+
+<div class="card small">
+
+This tool is for educational and physiotherapy tracking purposes only.  
+It does not replace medical diagnosis or clinical assessment.
+
+</div>
+
+</div>
 
 <script>
-let running=false, zero=0, currentAngle=0, minVal=999, maxVal=-999;
-let sessionData=[], captureInterval, speechInterval;
 
-const angleEl=document.getElementById("angle");
-const minEl=document.getElementById("min");
-const maxEl=document.getElementById("max");
+let running=false
+let zero=0
+let angle=0
 
-function speakAngle(){
-  const lang=document.getElementById("language").value;
-  let text="";
-  if(lang==="en") text=`Angle ${currentAngle.toFixed(1)} degrees`;
-  if(lang==="de") text=`Winkel ${currentAngle.toFixed(1)} Grad`;
-  if(lang==="es") text=`Ángulo ${currentAngle.toFixed(1)} grados`;
-  speechSynthesis.speak(new SpeechSynthesisUtterance(text));
-}
+let min=999
+let max=-999
 
-function startSpeech(){speechInterval=setInterval(()=>{if(running) speakAngle()},10000);}
-function startCapture(){
-  sessionData=[];
-  captureInterval=setInterval(()=>{
-    sessionData.push({time:new Date().toLocaleTimeString(), angle:currentAngle});
-    render();
-  },5000);
-}
-function stopCapture(){clearInterval(captureInterval);}
-function render(){
-  const table=document.getElementById("records");
-  table.innerHTML="";
-  sessionData.forEach(r=>{
-    let row=document.createElement("tr");
-    row.innerHTML=`<td>${r.time}</td><td>${r.angle.toFixed(1)}</td>`;
-    table.appendChild(row);
-  });
+let data=[]
+let interval
+
+function enableSensors(){
+
+if(!/Android/i.test(navigator.userAgent)){
+alert("Android phone required")
+return
 }
 
-// Sensor enable (Android only)
-document.getElementById("enableBtn").onclick=()=>{
-  if(!/Android/i.test(navigator.userAgent)){
-    alert("This feature is Android only.");
-    return;
-  }
-  if(DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function'){
-    DeviceOrientationEvent.requestPermission().then(response=>{
-      if(response==='granted') alert("Sensors enabled!"); else alert("Permission denied");
-    }).catch(console.error);
-  }
-  window.addEventListener("deviceorientation", e=>{
-    if(!running) return;
-    let val=0;
-    const plane=document.getElementById("plane").value;
-    if(plane==="alpha") val=e.alpha;
-    if(plane==="beta") val=e.beta;
-    if(plane==="gamma") val=e.gamma;
-    currentAngle=val-zero;
-    if(currentAngle>maxVal) maxVal=currentAngle;
-    if(currentAngle<minVal) minVal=currentAngle;
-    angleEl.innerText=currentAngle.toFixed(1);
-    minEl.innerText=minVal.toFixed(1);
-    maxEl.innerText=maxVal.toFixed(1);
-  });
+window.addEventListener("deviceorientation",e=>{
+
+if(!running) return
+
+angle=(e.beta-zero)
+
+document.getElementById("angle").innerText=angle.toFixed(1)+"°"
+
+if(angle>max) max=angle
+if(angle<min) min=angle
+
+document.getElementById("max").innerText=max.toFixed(1)
+document.getElementById("min").innerText=min.toFixed(1)
+
+})
+
+alert("Sensors enabled")
+
 }
 
-// Start / Stop
-document.getElementById("startBtn").onclick=()=>{
-  running=true;
-  startCapture();
-  startSpeech();
-}
-document.getElementById("stopBtn").onclick=()=>{
-  running=false;
-  stopCapture();
-  clearInterval(speechInterval);
-  analyzeMovement();
+function startSession(){
+
+running=true
+
+interval=setInterval(()=>{
+
+data.push(angle)
+
+updateTable()
+
+speak()
+
+},5000)
+
 }
 
-// Movement quality
-function analyzeMovement(){
-  if(sessionData.length<2){alert("Not enough data."); return;}
-  let diffs=[];
-  for(let i=1;i<sessionData.length;i++){diffs.push(Math.abs(sessionData[i].angle-sessionData[i-1].angle));}
-  let avg=diffs.reduce((a,b)=>a+b,0)/diffs.length;
-  let result="";
-  if(avg<2) result="Very smooth movement";
-  else if(avg<5) result="Normal movement";
-  else result="Irregular movement";
-  alert("Movement Quality: "+result);
+function stopSession(){
+
+running=false
+clearInterval(interval)
+
+analyzeAI()
+
 }
 
-// PDF / CSV export
-document.getElementById("pdfBtn").onclick=()=>{
-  const {jsPDF}=window.jspdf;
-  const doc=new jsPDF();
-  doc.text("YouMOVE Clinical Report",20,20);
-  doc.text("Joint: "+document.getElementById("joint").value,20,40);
-  doc.text("Max ROM: "+maxVal.toFixed(1),20,50);
-  doc.text("Min ROM: "+minVal.toFixed(1),20,60);
-  doc.save("YouMOVE_Report.pdf");
-}
-document.getElementById("csvBtn").onclick=()=>{
-  let csv="time,angle\n";
-  sessionData.forEach(r=>{csv+=`${r.time},${r.angle}\n`;});
-  let blob=new Blob([csv]);
-  let a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);
-  a.download="session.csv";
-  a.click();
+function setZero(){
+
+zero=angle
+min=0
+max=0
+
+alert("Zero set")
+
 }
 
-// Email / WhatsApp sharing
+function speak(){
+
+let msg=new SpeechSynthesisUtterance("Angle "+angle.toFixed(1)+" degrees")
+
+msg.lang="en-US"
+
+speechSynthesis.cancel()
+speechSynthesis.speak(msg)
+
+}
+
+function updateTable(){
+
+let table=document.getElementById("table")
+
+table.innerHTML=""
+
+data.forEach((v,i)=>{
+
+table.innerHTML+=`<tr><td>${i}</td><td>${v.toFixed(1)}</td></tr>`
+
+})
+
+}
+
+function analyzeAI(){
+
+if(data.length<3){
+document.getElementById("ai").innerText="Not enough data"
+return
+}
+
+let diff=[]
+
+for(let i=1;i<data.length;i++){
+
+diff.push(Math.abs(data[i]-data[i-1]))
+
+}
+
+let avg=diff.reduce((a,b)=>a+b)/diff.length
+
+let result=""
+
+if(avg<2) result="Excellent smooth movement"
+else if(avg<5) result="Normal controlled movement"
+else result="Irregular movement detected"
+
+document.getElementById("ai").innerText=result
+
+}
+
+function exportCSV(){
+
+let csv="angle\n"
+
+data.forEach(v=>csv+=v+"\n")
+
+let blob=new Blob([csv])
+
+let a=document.createElement("a")
+
+a.href=URL.createObjectURL(blob)
+
+a.download="youmove-session.csv"
+
+a.click()
+
+}
+
 function sendEmail(){
-  const joint=document.getElementById("joint").value;
-  const subject=encodeURIComponent(`YouMOVE Session Report - ${joint}`);
-  let csv="time,angle\n"; sessionData.forEach(r=>{csv+=`${r.time},${r.angle}\n`;});
-  const body=encodeURIComponent(`Hello,\n\nPlease find my ROM session results.\nJoint: ${joint}\nMin: ${minVal.toFixed(1)}°, Max: ${maxVal.toFixed(1)}°\n\nCSV Data:\n${csv}`);
-  window.location.href=`mailto:clinic@example.com?subject=${subject}&body=${body}`;
+
+let text=`YouMOVE Session
+
+Max ROM: ${max.toFixed(1)}
+Min ROM: ${min.toFixed(1)}
+
+AI Result: ${document.getElementById("ai").innerText}`
+
+window.location.href=`mailto:?subject=YouMOVE Report&body=${encodeURIComponent(text)}`
+
 }
+
 function sendWhatsApp(){
-  const joint=document.getElementById("joint").value;
-  let text=`YouMOVE Session Report\nJoint: ${joint}\nMin: ${minVal.toFixed(1)}°, Max: ${maxVal.toFixed(1)}°\nData:\n`;
-  sessionData.forEach(r=>{text+=`${r.time}: ${r.angle}°\n`;});
-  text=encodeURIComponent(text);
-  window.open(`https://wa.me/NUMBER?text=${text}`,"_blank"); // replace NUMBER with your WhatsApp
+
+let text=`YouMOVE Session
+
+Max ROM: ${max.toFixed(1)}
+Min ROM: ${min.toFixed(1)}
+
+AI Result: ${document.getElementById("ai").innerText}`
+
+window.open(`https://wa.me/?text=${encodeURIComponent(text)}`)
+
 }
 
-// Voice command (Android only)
-if(/Android/i.test(navigator.userAgent) && 'webkitSpeechRecognition' in window){
-  const rec=new webkitSpeechRecognition();
-  rec.continuous=true;
-  rec.onresult=e=>{
-    let txt=e.results[e.results.length-1][0].transcript.toLowerCase();
-    if(txt.includes("set zero")){
-      zero=currentAngle;
-      alert("Zero calibrated!");
-    }
-  }
-  rec.start();
+function enableVoice(){
+
+const Speech=window.SpeechRecognition||window.webkitSpeechRecognition
+
+if(!Speech){
+alert("Voice not supported")
+return
 }
 
-// Service worker for PWA
-if('serviceWorker' in navigator){navigator.serviceWorker.register('service-worker.js');}
+let rec=new Speech()
+
+rec.continuous=true
+
+rec.onresult=e=>{
+
+let txt=e.results[e.results.length-1][0].transcript.toLowerCase()
+
+if(txt.includes("zero")) setZero()
+if(txt.includes("start")) startSession()
+if(txt.includes("stop")) stopSession()
+
+}
+
+rec.start()
+
+alert("Voice commands enabled")
+
+}
+
 </script>
+
 </body>
 </html>
